@@ -19,21 +19,40 @@ package org.wso2.carbon.security.jaas;
 import com.nimbusds.jwt.SignedJWT;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.QueryStringDecoder;
+import org.opensaml.Configuration;
+import org.opensaml.DefaultBootstrap;
+import org.opensaml.saml2.core.Assertion;
+import org.opensaml.xml.ConfigurationException;
+import org.opensaml.xml.XMLObject;
+import org.opensaml.xml.io.Unmarshaller;
+import org.opensaml.xml.io.UnmarshallerFactory;
+import org.opensaml.xml.io.UnmarshallingException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
 import org.wso2.carbon.security.exception.CarbonSecurityException;
 import org.wso2.carbon.security.util.CarbonSecurityConstants;
+import org.xml.sax.SAXException;
 
 import javax.security.auth.callback.Callback;
 import javax.security.auth.callback.CallbackHandler;
 import javax.security.auth.callback.NameCallback;
 import javax.security.auth.callback.PasswordCallback;
 import javax.security.auth.callback.UnsupportedCallbackException;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
 import java.util.Base64;
+import java.util.List;
+import java.util.Map;
 
 /**
  * The class {@code CarbonCallbackHandler} is an implementation {@code CarbonCallbackHandler}.
@@ -53,6 +72,7 @@ public class CarbonCallbackHandler implements CallbackHandler {
 
     private SignedJWT singedJWT;
 
+    private Assertion SAMLAssertion;
 
     public CarbonCallbackHandler(HttpRequest httpRequest) {
 
@@ -97,6 +117,7 @@ public class CarbonCallbackHandler implements CallbackHandler {
                     CarbonCallback carbonCallback = ((CarbonCallback) callback);
                     try {
                         preProcessRequest(carbonCallback.getType());
+                        preProcessed = true;
                     } catch (CarbonSecurityException e) {
                         if (log.isDebugEnabled()) {
                             log.debug(e.getMessage(), e);
@@ -106,6 +127,9 @@ public class CarbonCallbackHandler implements CallbackHandler {
 
                     if (CarbonCallback.Type.JWT.equals(carbonCallback.getType())) {
                         ((CarbonCallback) callback).setContent(singedJWT);
+                    }
+                    if (CarbonCallback.Type.SAML.equals(carbonCallback.getType())) {
+                        ((CarbonCallback) callback).setContent(SAMLAssertion);
                     }
 
                 } else {
@@ -132,7 +156,7 @@ public class CarbonCallbackHandler implements CallbackHandler {
                             String credentials = authorizationHeader.trim().split(" ")[1];
                             byte[] decodedByte = credentials.getBytes(Charset.forName(StandardCharsets.UTF_8.name()));
                             String authDecoded = new String(Base64.getDecoder().decode(decodedByte),
-                                                            Charset.forName(StandardCharsets.UTF_8.name()));
+                                    Charset.forName(StandardCharsets.UTF_8.name()));
                             String[] authParts = authDecoded.split(":");
                             if (authParts.length == 2) {
                                 username = authParts[0];
@@ -146,7 +170,7 @@ public class CarbonCallbackHandler implements CallbackHandler {
 
                     } else if (CarbonCallback.Type.JWT.equals(type)) {
                         if (authorizationHeader.trim().startsWith(CarbonSecurityConstants
-                                                                          .HTTP_AUTHORIZATION_PREFIX_BEARER)) {
+                                .HTTP_AUTHORIZATION_PREFIX_BEARER)) {
 
                             String jwt = authorizationHeader.trim().split(" ")[1];
 
@@ -164,7 +188,41 @@ public class CarbonCallbackHandler implements CallbackHandler {
                         }
                     }
                 } else {
-                    throw new CarbonSecurityException("Authorization header cannot be found in the request.");
+                    //SAML Response doesn't require auth header?
+                    if (CarbonCallback.Type.SAML.equals(type)) {
+                        QueryStringDecoder queryStringDecoder = new QueryStringDecoder(httpRequest.getUri());
+                        Map<String, List<String>> requestParameters = queryStringDecoder.parameters();
+                        String b64SAMLResponse = requestParameters.get("SAMLResponse").get(0);
+                        XMLObject xmlObj = null;
+                        try {
+                            String responseXml;
+                            responseXml = new String(org.opensaml.xml.util.Base64.decode(b64SAMLResponse), "UTF-8");
+                            DefaultBootstrap.bootstrap();
+
+                            DocumentBuilderFactory documentBuilderFactory = DocumentBuilderFactory.newInstance();
+                            documentBuilderFactory.setNamespaceAware(true);
+                            DocumentBuilder docBuilder = documentBuilderFactory.newDocumentBuilder();
+                            ByteArrayInputStream is = new ByteArrayInputStream(responseXml.getBytes("UTF8"));
+                            Document document = docBuilder.parse(is);
+                            is.close();
+                            Element element = document.getDocumentElement();
+
+                            UnmarshallerFactory unmarshallerFactory = Configuration.getUnmarshallerFactory();
+                            Unmarshaller unmarshaller = unmarshallerFactory.getUnmarshaller(element);
+
+                            SAMLAssertion = (Assertion) unmarshaller.unmarshall(element);
+
+                        } catch (UnsupportedEncodingException e) {
+                            throw new CarbonSecurityException("Error decoding SAML Response", e);
+                        } catch (ConfigurationException e) {
+                            throw new CarbonSecurityException("Failed bootstrapping opensaml", e);
+                        } catch (ParserConfigurationException | SAXException | IOException | UnmarshallingException e) {
+                            throw new CarbonSecurityException("Failed to parse SAML XML Response", e);
+                        }
+                    } else {
+                        throw new CarbonSecurityException("Authorization header cannot be found in the request.");
+                    }
+
                 }
             } else {
                 throw new CarbonSecurityException("HTTP headers cannot be found in the request.");

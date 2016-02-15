@@ -59,6 +59,11 @@
             <artifactId>org.wso2.carbon.context.api</artifactId>
         </dependency>
         <dependency>
+            <groupId>org.opensaml</groupId>
+            <artifactId>opensaml</artifactId>
+            <version>${org.opensaml.version}</version>
+        </dependency>
+        <dependency>
             <groupId>org.testng</groupId>
             <artifactId>testng</artifactId>
             <version>6.9.4</version>
@@ -74,9 +79,12 @@
             org.slf4j.*;version="${slf4j.logging.package.import.version.range}",
             io.netty.handler.codec.http.*;version="${io.netty.package.import.version.range}",
             javax.security.auth.*,
+            javax.xml.*,
+            org.xml.*,
             com.nimbusds.jose.*;version="${com.nimbusds.package.import.version.range}",
             com.nimbusds.jwt.*;version="${com.nimbusds.package.import.version.range}",
-            org.wso2.carbon.context.api.*
+            org.wso2.carbon.context.api.*,
+            org.opensaml.*,
         </import.package>
 
         <dsannotations>*</dsannotations>
@@ -94,6 +102,7 @@
         <slf4j.logging.package.import.version.range>[1.7.1, 2.0.0)</slf4j.logging.package.import.version.range>
 
         <org.wso2.carbon.context.import.version.range>[5.0.0, 5.1.0)</org.wso2.carbon.context.import.version.range>
+        <org.opensaml.version>2.6.4</org.opensaml.version>
     </properties>
 
 </project>
