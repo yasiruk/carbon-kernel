@@ -16,7 +16,7 @@
 
 package org.wso2.carbon.security.util;
 
-import org.wso2.carbon.security.jaas.CarbonPermission;
+import org.wso2.carbon.security.permission.CarbonPermission;
 
 import java.util.Arrays;
 import java.util.HashMap;

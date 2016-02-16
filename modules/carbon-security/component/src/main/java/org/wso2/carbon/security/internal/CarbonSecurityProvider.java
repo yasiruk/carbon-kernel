@@ -49,20 +49,6 @@ public class CarbonSecurityProvider {
         Policy.setPolicy(policy);
         System.setSecurityManager(new SecurityManager());
 
-        // Granting limited number of permissions for the bundle
-        Bundle bundle = bundleContext.getBundle();
-        String bundleLocation = bundle.getLocation();
-        PermissionAdmin permissionAdmin = getPermissionAdmin(bundleContext);
-        if (permissionAdmin != null) {
-            List<PermissionInfo> permissionInfoList = new ArrayList<>();
-            permissionInfoList.add(new PermissionInfo(AuthPermission.class.getName(),"createLoginContext", null));
-            permissionInfoList.add(new PermissionInfo(AuthPermission.class.getName(),"doAsPrivileged", null));
-            permissionInfoList.add(new PermissionInfo(AuthPermission.class.getName(),"modifyPrincipals", null));
-            permissionInfoList.add(new PermissionInfo(PackagePermission.class.getName(),"*", "exportonly,import"));
-            permissionInfoList.add(new PermissionInfo(ManagementPermission.class.getName(),"control", null));
-            permissionAdmin.setPermissions(bundleLocation, permissionInfoList
-                    .toArray(new PermissionInfo[permissionInfoList.size()]));
-        }
     }
 
     @Deactivate

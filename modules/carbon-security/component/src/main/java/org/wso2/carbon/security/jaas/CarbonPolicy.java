@@ -16,6 +16,7 @@
 
 package org.wso2.carbon.security.jaas;
 
+import org.wso2.carbon.security.permission.CarbonPermission;
 import sun.security.provider.PolicyFile;
 
 import java.net.URL;
