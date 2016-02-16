@@ -16,21 +16,14 @@
 
 package org.wso2.carbon.security.internal;
 
-import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
-import org.osgi.framework.PackagePermission;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Deactivate;
 import org.osgi.service.permissionadmin.PermissionAdmin;
-import org.osgi.service.permissionadmin.PermissionInfo;
 import org.wso2.carbon.security.jaas.CarbonPolicy;
 
-import java.lang.management.ManagementPermission;
 import java.security.Policy;
-import java.util.ArrayList;
-import java.util.List;
-import javax.security.auth.AuthPermission;
 
 /**
  * OSGi service component which handle authentication and authorization
