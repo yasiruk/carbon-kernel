@@ -73,6 +73,7 @@ public class SAMLLoginModule implements LoginModule {
     private static final Logger log = LoggerFactory.getLogger(SAMLLoginModule.class);
     //string constants used as parameters in the options passed to the loginModule
     public static final String OPT_KEYSTORE_FILE = "keystorefile";
+    public static final String OPT_KEYSTORE_INSTANCE = "keystore";
     public static final String OPT_IDP_CERT_ALIAS = "certalias";
     public static final String OPT_KEYSTORE_PW = "keystorepassword";
 
@@ -83,7 +84,7 @@ public class SAMLLoginModule implements LoginModule {
     private String certificateAlias = "wso2carbon";
     private String keyStorePassword = "wso2carbon";
     private String b64SAMLResponse;
-    private Response samlResponse;
+    private Assertion samlAssertion;
     private CarbonPrincipal userPrincipal;
     private KeyStore keyStore;
     boolean success;
@@ -115,7 +116,9 @@ public class SAMLLoginModule implements LoginModule {
             certificateAlias = (String) options.get(OPT_IDP_CERT_ALIAS);
             keyStorePassword = (String) options.get(OPT_KEYSTORE_PW);
         }
-
+        if (options != null && options.containsKey(OPT_KEYSTORE_INSTANCE)) {
+            this.keyStore = (KeyStore)options.get(OPT_KEYSTORE_INSTANCE);
+        }
         this.success = false;
 
     }
@@ -130,27 +133,27 @@ public class SAMLLoginModule implements LoginModule {
         } catch (IOException | UnsupportedCallbackException e) {
             throw new LoginException("Failed fetch SAML data");
         }
-        Assertion assertion = (Assertion) ((CarbonCallback)callbacks[0]).getContent();
+        samlAssertion = (Assertion) ((CarbonCallback)callbacks[0]).getContent();
 
         try {
-            validateSignature(assertion);
+            validateSignature(samlAssertion);
         } catch (ValidationException e) {
             throw new LoginException("Failed to validate SAML Signature");
         }
-        if (samlResponse.getAssertions().size() > 0) { //assertions exist and are not encrypted
-            org.opensaml.saml2.core.Subject samlSubject =assertion.getSubject();
+        if (samlAssertion != null) { //assertions exist and are not encrypted
+            org.opensaml.saml2.core.Subject samlSubject =samlAssertion.getSubject();
             if (samlSubject != null && samlSubject.getNameID().getValue() != null) {
                 success = true;
                 return true;
             }
         }
 
-        return false;
+        return true;
     }
 
     @Override
     public boolean commit() throws LoginException {
-        userPrincipal = new CarbonPrincipal(samlResponse.getAssertions().get(0).getSubject().getNameID().getValue());
+        userPrincipal = new CarbonPrincipal(samlAssertion.getSubject().getNameID().getValue());
         subject.getPrincipals().add(userPrincipal);
         return true;
     }

@@ -23,6 +23,7 @@ import io.netty.handler.codec.http.QueryStringDecoder;
 import org.opensaml.Configuration;
 import org.opensaml.DefaultBootstrap;
 import org.opensaml.saml2.core.Assertion;
+import org.opensaml.saml2.core.Response;
 import org.opensaml.xml.ConfigurationException;
 import org.opensaml.xml.XMLObject;
 import org.opensaml.xml.io.Unmarshaller;
@@ -72,6 +73,7 @@ public class CarbonCallbackHandler implements CallbackHandler {
 
     private SignedJWT singedJWT;
 
+    private Response SAMLResponse;
     private Assertion SAMLAssertion;
 
     public CarbonCallbackHandler(HttpRequest httpRequest) {
@@ -210,7 +212,8 @@ public class CarbonCallbackHandler implements CallbackHandler {
                             UnmarshallerFactory unmarshallerFactory = Configuration.getUnmarshallerFactory();
                             Unmarshaller unmarshaller = unmarshallerFactory.getUnmarshaller(element);
 
-                            SAMLAssertion = (Assertion) unmarshaller.unmarshall(element);
+                            SAMLResponse = (Response)unmarshaller.unmarshall(element);
+                            SAMLAssertion = SAMLResponse.getAssertions().get(0);
 
                         } catch (UnsupportedEncodingException e) {
                             throw new CarbonSecurityException("Error decoding SAML Response", e);
