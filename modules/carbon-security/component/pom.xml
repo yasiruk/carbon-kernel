@@ -68,6 +68,11 @@
             <version>${org.opensaml.version}</version>
         </dependency>
         <dependency>
+            <groupId>xerces.wso2</groupId>
+            <artifactId>xercesImpl</artifactId>
+            <version>${xercesImpl.version}</version>
+        </dependency>
+        <dependency>
             <groupId>org.testng</groupId>
             <artifactId>testng</artifactId>
             <version>6.9.4</version>
@@ -84,6 +89,7 @@
             org.slf4j.*;version="${slf4j.logging.package.import.version.range}",
             io.netty.handler.codec.http.*;version="${io.netty.package.import.version.range}",
             javax.security.auth.*,
+            org.apache.xerces.util; resolution:=optional,
             javax.xml.*,
             org.xml.*,
             com.nimbusds.jose.*;version="${com.nimbusds.package.import.version.range}",
@@ -103,7 +109,7 @@
         <!-- Dependency package version ranges -->
         <io.netty.package.import.version.range>[4.0,5)</io.netty.package.import.version.range>
         <com.nimbusds.package.import.version.range>[2.26.1, 2.27)</com.nimbusds.package.import.version.range>
-
+        <xercesImpl.version>2.8.1.wso2v2</xercesImpl.version>
         <!--Logging API version range-->
         <slf4j.logging.package.import.version.range>[1.7.1, 2.0.0)</slf4j.logging.package.import.version.range>
 

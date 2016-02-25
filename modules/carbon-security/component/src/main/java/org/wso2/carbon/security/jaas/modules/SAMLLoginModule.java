@@ -117,7 +117,7 @@ public class SAMLLoginModule implements LoginModule {
             keyStorePassword = (String) options.get(OPT_KEYSTORE_PW);
         }
         if (options != null && options.containsKey(OPT_KEYSTORE_INSTANCE)) {
-            this.keyStore = (KeyStore)options.get(OPT_KEYSTORE_INSTANCE);
+            this.keyStore = (KeyStore) options.get(OPT_KEYSTORE_INSTANCE);
         }
         this.success = false;
 
@@ -133,7 +133,7 @@ public class SAMLLoginModule implements LoginModule {
         } catch (IOException | UnsupportedCallbackException e) {
             throw new LoginException("Failed fetch SAML data");
         }
-        samlAssertion = (Assertion) ((CarbonCallback)callbacks[0]).getContent();
+        samlAssertion = (Assertion) ((CarbonCallback) callbacks[0]).getContent();
 
         try {
             validateSignature(samlAssertion);
@@ -141,7 +141,7 @@ public class SAMLLoginModule implements LoginModule {
             throw new LoginException("Failed to validate SAML Signature");
         }
         if (samlAssertion != null) { //assertions exist and are not encrypted
-            org.opensaml.saml2.core.Subject samlSubject =samlAssertion.getSubject();
+            org.opensaml.saml2.core.Subject samlSubject = samlAssertion.getSubject();
             if (samlSubject != null && samlSubject.getNameID().getValue() != null) {
                 success = true;
                 return true;
@@ -217,62 +217,10 @@ public class SAMLLoginModule implements LoginModule {
 
     }
 
-    private void requestPreProcessor(HttpRequest request) throws CarbonSecurityException {
-        HttpPostRequestDecoder decoder = new HttpPostRequestDecoder(new DefaultHttpDataFactory(false), request);
-
-        InterfaceHttpData data = decoder.getBodyHttpData("SAMLResponse");
-        if (data.getHttpDataType() == InterfaceHttpData.HttpDataType.Attribute) {
-            Attribute attribute = (Attribute) data;
-
-            try {
-                this.b64SAMLResponse = attribute.getValue();
-            } catch (IOException e) {
-                throw new CarbonSecurityException("Error while reading SAML2 Response", e);
-            }
-
-        } else {
-            throw new CarbonSecurityException("SAML2 Response not found");
-        }
-    }
-
-    private Response parseSAMLResponse(String b64SAMLResponse) throws LoginException {
-        XMLObject xmlObj = null;
-        try {
-            String responseXml;
-            responseXml = new String(Base64.decode(b64SAMLResponse), "UTF-8");
-            DefaultBootstrap.bootstrap();
-
-            DocumentBuilderFactory documentBuilderFactory = DocumentBuilderFactory.newInstance();
-            documentBuilderFactory.setNamespaceAware(true);
-            DocumentBuilder docBuilder = documentBuilderFactory.newDocumentBuilder();
-            ByteArrayInputStream is = new ByteArrayInputStream(responseXml.getBytes("UTF8"));
-            Document document = docBuilder.parse(is);
-            is.close();
-            Element element = document.getDocumentElement();
-
-            UnmarshallerFactory unmarshallerFactory = Configuration.getUnmarshallerFactory();
-            Unmarshaller unmarshaller = unmarshallerFactory.getUnmarshaller(element);
-
-            xmlObj = unmarshaller.unmarshall(element);
-
-        } catch (UnsupportedEncodingException e) {
-            throw new LoginException("Error decoding SAML Response");
-        } catch (ConfigurationException e) {
-            throw new LoginException("Failed bootstrapping opensaml");
-        } catch (ParserConfigurationException | SAXException | IOException | UnmarshallingException e) {
-            throw new LoginException("Failed to parse SAML XML Response");
-        } catch (Throwable e) {
-            if (log.isDebugEnabled()) {
-                log.error("Error while passing SAML Reponse", e);
-            }
-        }
-        return (Response) xmlObj;
-    }
-
     private static KeyStore getKeystore(String keyStorePath, char[] keyStorePassword) throws CarbonSecurityException {
         KeyStore keyStore = null;
 
-        if(keystoreCache.containsKey(keyStorePath))
+        if (keystoreCache.containsKey(keyStorePath))
             return keystoreCache.get(keyStorePath);
 
         try {

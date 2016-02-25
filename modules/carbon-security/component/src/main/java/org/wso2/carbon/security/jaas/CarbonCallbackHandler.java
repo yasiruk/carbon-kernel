@@ -20,6 +20,8 @@ import com.nimbusds.jwt.SignedJWT;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.QueryStringDecoder;
+import org.apache.xerces.impl.Constants;
+import org.apache.xerces.util.SecurityManager;
 import org.opensaml.Configuration;
 import org.opensaml.DefaultBootstrap;
 import org.opensaml.saml2.core.Assertion;
@@ -35,6 +37,8 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.wso2.carbon.security.exception.CarbonSecurityException;
 import org.wso2.carbon.security.util.CarbonSecurityConstants;
+import org.xml.sax.EntityResolver;
+import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 
 import javax.security.auth.callback.Callback;
@@ -42,6 +46,7 @@ import javax.security.auth.callback.CallbackHandler;
 import javax.security.auth.callback.NameCallback;
 import javax.security.auth.callback.PasswordCallback;
 import javax.security.auth.callback.UnsupportedCallbackException;
+import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
@@ -75,6 +80,10 @@ public class CarbonCallbackHandler implements CallbackHandler {
 
     private Response SAMLResponse;
     private Assertion SAMLAssertion;
+
+    private static final String SECURITY_MANAGER_PROPERTY = Constants.XERCES_PROPERTY_PREFIX +
+            Constants.SECURITY_MANAGER_PROPERTY;
+    private static final int ENTITY_EXPANSION_LIMIT = 0;
 
     public CarbonCallbackHandler(HttpRequest httpRequest) {
 
@@ -119,7 +128,6 @@ public class CarbonCallbackHandler implements CallbackHandler {
                     CarbonCallback carbonCallback = ((CarbonCallback) callback);
                     try {
                         preProcessRequest(carbonCallback.getType());
-                        preProcessed = true;
                     } catch (CarbonSecurityException e) {
                         if (log.isDebugEnabled()) {
                             log.debug(e.getMessage(), e);
@@ -130,7 +138,7 @@ public class CarbonCallbackHandler implements CallbackHandler {
                     if (CarbonCallback.Type.JWT.equals(carbonCallback.getType())) {
                         ((CarbonCallback) callback).setContent(singedJWT);
                     }
-                    if (CarbonCallback.Type.SAML.equals(carbonCallback.getType())) {
+                    else if (CarbonCallback.Type.SAML.equals(carbonCallback.getType())) {
                         ((CarbonCallback) callback).setContent(SAMLAssertion);
                     }
 
@@ -190,12 +198,19 @@ public class CarbonCallbackHandler implements CallbackHandler {
                         }
                     }
                 } else {
-                    //SAML Response doesn't require auth header?
+
                     if (CarbonCallback.Type.SAML.equals(type)) {
                         QueryStringDecoder queryStringDecoder = new QueryStringDecoder(httpRequest.getUri());
                         Map<String, List<String>> requestParameters = queryStringDecoder.parameters();
-                        String b64SAMLResponse = requestParameters.get("SAMLResponse").get(0);
-                        XMLObject xmlObj = null;
+                        String b64SAMLResponse = null;
+                        if(requestParameters.get("SAMLResponse") != null ||
+                                requestParameters.get("SAMLReponse").size() > 0) {
+                            b64SAMLResponse = requestParameters.get("SAMLResponse").get(0);
+                        } else {
+                            throw new CarbonSecurityException("SAMLResponse not found in request.");
+                        }
+
+                        ByteArrayInputStream is = null;
                         try {
                             String responseXml;
                             responseXml = new String(org.opensaml.xml.util.Base64.decode(b64SAMLResponse), "UTF-8");
@@ -203,10 +218,21 @@ public class CarbonCallbackHandler implements CallbackHandler {
 
                             DocumentBuilderFactory documentBuilderFactory = DocumentBuilderFactory.newInstance();
                             documentBuilderFactory.setNamespaceAware(true);
+
+                            documentBuilderFactory.setExpandEntityReferences(false);
+                            documentBuilderFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+                            SecurityManager securityManager = new SecurityManager();
+                            securityManager.setEntityExpansionLimit(ENTITY_EXPANSION_LIMIT);
+                            documentBuilderFactory.setAttribute(SECURITY_MANAGER_PROPERTY, securityManager);
                             DocumentBuilder docBuilder = documentBuilderFactory.newDocumentBuilder();
-                            ByteArrayInputStream is = new ByteArrayInputStream(responseXml.getBytes("UTF8"));
+
+                            docBuilder.setEntityResolver((publicId, systemId) -> {
+                                throw new SAXException("SAML request contains invalid elements. Possible XML External Entity (XXE) attack.");
+                            });
+
+                            is = new ByteArrayInputStream(responseXml.getBytes(StandardCharsets.UTF_8));
                             Document document = docBuilder.parse(is);
-                            is.close();
+
                             Element element = document.getDocumentElement();
 
                             UnmarshallerFactory unmarshallerFactory = Configuration.getUnmarshallerFactory();
@@ -221,6 +247,14 @@ public class CarbonCallbackHandler implements CallbackHandler {
                             throw new CarbonSecurityException("Failed bootstrapping opensaml", e);
                         } catch (ParserConfigurationException | SAXException | IOException | UnmarshallingException e) {
                             throw new CarbonSecurityException("Failed to parse SAML XML Response", e);
+                        } finally {
+                            if(is != null) {
+                                try {
+                                    is.close();
+                                } catch (IOException e) {
+                                    log.error("Error while closing the stream", e);
+                                }
+                            }
                         }
                     } else {
                         throw new CarbonSecurityException("Authorization header cannot be found in the request.");
